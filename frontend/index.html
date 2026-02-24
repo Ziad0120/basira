@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport"
+          content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
+    <title>Basira GPT | بصيرة</title>
+
+    <!-- Icons -->
+    <link rel="stylesheet"
+          href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" />
+
+    <!-- Font -->
+    <link href="https://fonts.googleapis.com/css2?family=Tajawal:wght@400;700;800&display=swap"
+          rel="stylesheet">
+
+    <!-- SweetAlert -->
+    <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+
+    <!-- Puter -->
+    <script src="https://js.puter.com/v2/"></script>
+
+    <!-- Styles -->
+    <link rel="stylesheet" href="css/style.css" />
+</head>
+
+<body>
+
+<!-- ================= ANIMATION OVERLAY (CINEMATIC) ================= -->
+<div id="vision-overlay" class="hidden"></div>
+
+<!-- ================= VIDEO ================= -->
+<video id="video-feed" autoplay playsinline muted class="hidden"></video>
+
+<!-- ================= GATE ================= -->
+<section id="gate-scr" class="gate">
+
+    <!-- Blind -->
+    <div class="split-side blind-side"
+         onclick="app.initBlind()">
+
+        <div class="content-box">
+            <div class="icon-circle">
+                <i class="fas fa-microphone-alt"></i>
+            </div>
+            <h2>وضع الكفيف</h2>
+            <span>تفاعل صوتي ذكي بالكامل</span>
+        </div>
+
+    </div>
+
+    <!-- Vision -->
+    <div class="split-side vision-side"
+         onclick="app.showVisionOptionsAnimated()">
+
+        <div class="content-box">
+            <div class="icon-circle">
+                <i class="fas fa-eye"></i>
+            </div>
+            <h2>وضع المبصر</h2>
+            <span>واجهة بصرية متطورة</span>
+        </div>
+
+    </div>
+
+</section>
+
+<!-- ================= VISION OPTIONS ================= -->
+<section id="vision-scr" class="v-opt hidden">
+
+    <div class="options-container">
+
+        <button class="close-options-btn"
+                onclick="app.backToGate()">
+            <i class="fas fa-xmark"></i>
+        </button>
+
+        <h2>تخصيص العرض</h2>
+        <p>اختر النمط المناسب لراحتك البصرية</p>
+
+        <div class="v-grid">
+
+<button class="v-btn card normal"
+        onclick="app.initVision('normal')">
+    <i class="fas fa-magic"></i>
+    <div>
+        <h4>الوضع العادي</h4>
+        <span>تصميم متوازن وألوان قياسية</span>
+    </div>
+</button>
+
+<button class="v-btn card low"
+        onclick="app.initVision('low-vision')">
+    <i class="fas fa-magnifying-glass-plus"></i>
+    <div>
+        <h4>ضعاف النظر</h4>
+        <span>خط أكبر ومسافات أوضح</span>
+    </div>
+</button>
+
+<button class="v-btn card blind"
+        onclick="app.initVision('color-blind')">
+    <i class="fas fa-circle-half-stroke"></i>
+    <div>
+        <h4>عمى الألوان</h4>
+        <span>تباين عالي وألوان واضحة</span>
+    </div>
+</button>
+
+        </div>
+
+    </div>
+
+</section>
+
+<!-- ================= SIDEBAR ================= -->
+<aside id="chat-sidebar" class="chat-sidebar hidden">
+
+    <div class="sidebar-header">
+        <h3><i class="fas fa-history"></i> سجل المحادثات</h3>
+
+        <button class="icon-btn"
+                onclick="app.toggleSidebar(false)">
+            <i class="fas fa-times"></i>
+        </button>
+    </div>
+
+    <button class="new-chat-btn"
+            onclick="app.createNewChat()">
+        <i class="fas fa-plus-circle"></i>
+        محادثة جديدة
+    </button>
+
+    <div id="chat-list" class="chat-list"></div>
+
+    <div class="sidebar-footer">
+        <button class="delete-all-btn"
+                onclick="app.clearHistory()">
+            <i class="fas fa-trash"></i>
+            مسح السجل الحالي
+        </button>
+        <button id="change-vision-btn" class="sidebar-vision-btn">
+    👁 تغيير نمط العرض
+</button>
+    </div>
+
+</aside>
+
+<!-- ================= CHAT UI ================= -->
+<section id="chat-ui" class="chat-wrap hidden">
+
+    <header class="chat-header">
+
+        <button class="icon-btn"
+                onclick="app.toggleSidebar(true)">
+            <i class="fas fa-bars"></i>
+        </button>
+
+        <div class="status-indicator">
+            <span class="status-dot"></span>
+            <span class="status-text">BASIRA بصيرة</span>
+        </div>
+
+        <button class="icon-btn"
+                onclick="app.backToGate()">
+            <i class="fas fa-arrow-right-from-bracket"></i>
+        </button>
+
+    </header>
+
+    <div id="chat-body">
+        <div class="empty-chat-placeholder">
+            <i class="fas fa-comment-dots"></i>
+            <h3>مرحباً بك في بصيرة</h3>
+            <p>ابدأ المحادثة الآن أو ارفع ملفاً لتحليله</p>
+        </div>
+    </div>
+
+    <!-- INPUT -->
+    <div class="input-area">
+
+        <div id="file-preview-container" class="hidden"></div>
+
+        <div class="input-container-neo">
+
+            <label for="file-up"
+                   class="icon-btn"
+                   title="إرفاق ملف">
+                <i class="fas fa-paperclip"></i>
+            </label>
+
+<input type="file" 
+       id="file-up" 
+       hidden 
+       onchange="app.handleFileSelect(event)" 
+       accept="*" />
+
+
+            <textarea id="chat-input"
+                      class="input-field-neo"
+                      rows="1"
+                      placeholder="اكتب سؤالك هنا..."></textarea>
+
+<button id="send-btn" class="send-btn-neo" onclick="app.handleSend()">
+    <i class="fas fa-paper-plane"></i>
+</button>
+
+
+        </div>
+
+    </div>
+
+</section>
+
+<!-- ================= BLIND UI ================= -->
+<section id="blind-ui" class="blind-ui hidden">
+
+    <div class="visualizer-container">
+        <div class="bar"></div><div class="bar"></div>
+        <div class="bar"></div><div class="bar"></div>
+        <div class="bar"></div><div class="bar"></div>
+        <div class="bar"></div>
+    </div>
+
+<div class="mic-circle" onclick="app.startRecording()">
+    <i class="fas fa-microphone"></i>
+</div>
+    <h2 id="blind-status">انقر للتحدث...</h2>
+
+    <button class="exit-blind"
+            onclick="app.backToGate()">
+        <i class="fas fa-door-open"></i>
+        العودة للرئيسية
+    </button>
+
+</section>
+
+<!-- ================= SCRIPT ================= -->
+<script src="js/app.js"></script>
+
+</body>
+</html>
