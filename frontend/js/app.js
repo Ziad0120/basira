@@ -278,34 +278,40 @@ setTimeout(() => {
 },
 
 backToGate() {
+    // إذا كان المستخدم في وضع الكفيف، نقوم بعمل ريفرش للصفحة
+    if (this.currentMode === "blind") {
+        window.location.reload();
+        return; // توقف هنا لأن الصفحة ستُعاد تحميلها
+    }
 
-ui.chat.classList.add("hidden");  
-ui.blind.classList.add("hidden");  
-ui.vision.classList.add("hidden");  
-ui.gate.classList.remove("hidden");  
+    // الكود الأصلي لبقية الأوضاع (المبصر)
+    ui.chat.classList.add("hidden");  
+    ui.blind.classList.add("hidden");  
+    ui.vision.classList.add("hidden");  
+    ui.gate.classList.remove("hidden");  
 
-this.audioPlayer.pause();  
-this.audioPlayer.currentTime = 0;  
+    this.audioPlayer.pause();  
+    this.audioPlayer.currentTime = 0;  
 
-voiceState = "idle";  
+    voiceState = "idle";  
 
-const vision = document.querySelector(".vision-side");  
-const blind = document.querySelector(".blind-side");  
-const visionContent = vision.querySelector(".content-box");  
-const blindContent = blind.querySelector(".content-box");  
+    const vision = document.querySelector(".vision-side");  
+    const blind = document.querySelector(".blind-side");  
+    const visionContent = vision.querySelector(".content-box");  
+    const blindContent = blind.querySelector(".content-box");  
 
-vision.classList.remove("expand-x");  
-blind.classList.remove("hide-side");  
+    vision.classList.remove("expand-x");  
+    blind.classList.remove("hide-side");  
 
-visionContent.classList.remove("center-screen", "move-up");  
-blindContent.style.opacity = "1";  
+    visionContent.classList.remove("center-screen", "move-up");  
+    blindContent.style.opacity = "1";  
 
-const details = document.querySelector(".details-text");  
-if (details) details.remove();  
+    const details = document.querySelector(".details-text");  
+    if (details) details.remove();  
 
-this.currentMode = null;
-
+    this.currentMode = null;
 },
+
 /* ================= CHAT ================= */
 
 async handleSend() {
