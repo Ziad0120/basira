@@ -2,9 +2,13 @@ const { execFile } = require('child_process');
 const path = require('path');
 const fs = require('fs');
 const Groq = require('groq-sdk');
-require('dotenv').config({ path: path.resolve(__dirname, '../../.env') });
+const { createClient } = require("@deepgram/sdk");
+
+require('dotenv').config({ path: path.resolve(__dirname, '../.env') });
 
 const groq = new Groq({ apiKey: process.env.GROQ_API_KEY });
+
+const deepgram = createClient(process.env.DEEPGRAM_API_KEY);
 
 /* =======================================================
    MEMORY OPTIMIZATION + TOKEN PROTECTION
@@ -20,28 +24,44 @@ function optimizeHistory(history = []) {
 }
 
 /* =======================================================
-   STT - Whisper Large v3
+   STT - NOVA V3
 ======================================================= */
+
+
 
 async function transcribeAudio(filePath) {
     try {
+
         if (!fs.existsSync(filePath))
             throw new Error("Audio file not found");
 
-        const result = await groq.audio.transcriptions.create({
-            file: fs.createReadStream(filePath),
-            model: 'whisper-large-v3',
-            language: 'ar'
-        });
+        const audioBuffer = fs.readFileSync(filePath);
 
-        return result.text;
+        const { result } = await deepgram.listen.prerecorded.transcribeFile(
+            audioBuffer,
+            {
+                model: "nova-3",
+                language: "ar",
+                smart_format: false,
+                punctuate: false,
+                diarize: false,
+                filler_words: false
+            }
+        );
+
+        const text =
+            result?.results?.channels?.[0]?.alternatives?.[0]?.transcript || "";
+
+        return text;
 
     } catch (error) {
-        console.error('❌ STT Error:', error.message);
+        console.error("❌ Deepgram STT Error:", error.message);
         throw error;
 
     } finally {
-        try { if (fs.existsSync(filePath)) fs.unlinkSync(filePath); } catch {}
+        try {
+            if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
+        } catch {}
     }
 }
 
