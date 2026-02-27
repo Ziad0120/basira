@@ -1,10 +1,3 @@
-/* ======================================================
-BASIRA GPT - FULL ORIGINAL BUILD + CAMERA EXTENSION
-✔ No Feature Removed
-✔ Blind Camera Voice Command
-✔ No Base64 Memory Explosion
-====================================================== */
-
 let selectedFile = null;
 let mediaRecorder = null;
 let audioChunks = [];
@@ -247,34 +240,27 @@ initVision(mode){
     this.audioPlayer.currentTime = 0;
 },
 
-initBlind() {
+async initBlind() {
+    ui.gate.classList.add("hidden");  
+    ui.blind.classList.remove("hidden");  
+    this.currentMode = "blind";  
 
-ui.gate.classList.add("hidden");  
-ui.blind.classList.remove("hidden");  
+    let id = Object.keys(this.chats).find(c => c.startsWith("blind_"));  
+    if (!id) {  
+        id = "blind_" + Date.now();  
+        this.chats[id] = { id, name: "شات كفيف", messages: [] };  
+        ChatStore.save(this.chats);  
+    }  
+    this.loadChat(id);  
 
-this.currentMode = "blind";  
+    // تحديث الواجهة وتجهيز المستخدم
+    ui.blindStatus.textContent = "جاري الاستعداد...";
+    
+    // تشغيل ملف "أنا أسمعك تفضل" المسجل مسبقاً والانتظار حتى ينتهي
+    await this.playLocalAudio("/uploads/listening.mp3");
 
-let id = Object.keys(this.chats).find(c => c.startsWith("blind_"));  
-
-if (!id) {  
-
-    id = "blind_" + Date.now();  
-
-    this.chats[id] = {  
-        id,  
-        name: "شات كفيف",  
-        messages: []  
-    };  
-
-    ChatStore.save(this.chats);  
-}  
-
-this.loadChat(id);  
-
-setTimeout(() => {  
-    this.startRecording();  
-}, 700);
-
+    // بعد انتهاء الملف الصوتي، نفتح المايك فوراً
+    this.startRecording();
 },
 
 backToGate() {
@@ -547,140 +533,168 @@ applyVision(mode){
 
 async startRecording() {
 
-if (voiceState !== "idle") return;  
-if (!navigator.mediaDevices?.getUserMedia) return;  
-
-try {  
-
-    recordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });  
-
-    mediaRecorder = new MediaRecorder(recordingStream);  
-    audioChunks = [];  
-
-    mediaRecorder.ondataavailable = e => audioChunks.push(e.data);  
-    mediaRecorder.start();  
-
-    audioContext = new AudioContext();  
-    sourceNode = audioContext.createMediaStreamSource(recordingStream);  
-    analyser = audioContext.createAnalyser();  
-    analyser.fftSize = 256;  
-    sourceNode.connect(analyser);  
-
-    const dataArray = new Uint8Array(analyser.frequencyBinCount);  
-
-    this.setVoiceState("recording");  
-
-    const checkSilence = () => {  
-
-        if (voiceState !== "recording") return;  
-
-        analyser.getByteFrequencyData(dataArray);  
-        const volume = dataArray.reduce((a,b)=>a+b)/dataArray.length;  
-
-        if (volume < silenceThreshold) {  
-            if (!silenceTimer) {  
-                silenceTimer = setTimeout(() => this.stopRecording(), silenceDelay);  
-            }  
-        } else {  
-            clearTimeout(silenceTimer);  
-            silenceTimer = null;  
-        }  
-
-        if (mediaRecorder?.state === "recording") {  
-            requestAnimationFrame(checkSilence);  
-        }  
-    };  
-
-    checkSilence();  
-
-} catch (err) {  
-    console.error(err);  
-    voiceState = "idle";  
-}
-
-},
-
-async stopRecording() {
-
-if (!mediaRecorder || mediaRecorder.state !== "recording") return;  
-if (voiceState !== "recording") return;  
-
-this.setVoiceState("thinking");  
-
-clearTimeout(silenceTimer);  
-silenceTimer = null;  
-
-mediaRecorder.stop();  
-recordingStream?.getTracks().forEach(t => t.stop());  
-
-mediaRecorder.onstop = async () => {  
-
-    const blob = new Blob(audioChunks, { type: "audio/webm" });  
-    const form = new FormData();  
-    form.append("audio", blob, "voice.webm");  
+    if (voiceState !== "idle") return;  
+    if (!navigator.mediaDevices?.getUserMedia) return;  
 
     try {  
 
-        const res = await fetch("/transcribe", {  
-            method: "POST",  
-            body: form  
-        });  
+        recordingStream = await navigator.mediaDevices.getUserMedia({ audio: true });  
 
-        const data = await res.json();  
+        mediaRecorder = new MediaRecorder(recordingStream);  
+        audioChunks = [];  
 
-        if (!data.text?.trim()) {  
-            emptyTranscriptCount++;  
-            voiceState = "idle";  
-            if (emptyTranscriptCount < MAX_EMPTY_TRANSCRIPTS)  
-                return this.startRecording();  
-            emptyTranscriptCount = 0;  
-            return;  
-        }  
+        mediaRecorder.ondataavailable = e => audioChunks.push(e.data);  
+        mediaRecorder.start();  
 
-        emptyTranscriptCount = 0;  
+        audioContext = new AudioContext();  
+        sourceNode = audioContext.createMediaStreamSource(recordingStream);  
+        analyser = audioContext.createAnalyser();  
+        analyser.fftSize = 256;  
+        sourceNode.connect(analyser);  
 
-        const userText = data.text.trim();  
-        this.append(userText, "user");  
+        const dataArray = new Uint8Array(analyser.frequencyBinCount);  
 
-        /* ================= CAMERA COMMAND ================= */  
+        this.setVoiceState("recording");  
 
-        const lower = userText.toLowerCase();  
+        let hasStartedSpeaking = false; // تتبع إذا كان المستخدم قد بدأ الكلام
 
-if (/افتح.*كاميرا|شغل.*كاميرا|صور|صوّر|شوف قدامي/.test(lower)) {
-    await this.captureAndDescribe();
-    return;
-}
+        const checkSilence = () => {  
 
-        /* ================= NORMAL CHAT ================= */  
+            if (voiceState !== "recording") return;  
 
-        const chatRes = await fetch("/chat", {  
-            method: "POST",  
-            headers: { "Content-Type": "application/json" },  
-            body: JSON.stringify({  
-                message: userText,  
-                history: this.chatHistory,  
-                visionContext: lastVisionContext || null  
-            })  
-        });  
+            analyser.getByteFrequencyData(dataArray);  
+            const volume = dataArray.reduce((a,b)=>a+b)/dataArray.length;  
 
-        const chatData = await chatRes.json();  
-        const reply = chatData.reply || "حدث خطأ";  
-        this.append(reply, "bot");
-        await this.speak(reply);  
+            // إذا ارتفع الصوت، نعتبر أنه بدأ التحدث
+            if (volume > silenceThreshold + 5) {
+                hasStartedSpeaking = true;
+            }
 
-        this.setVoiceState("idle");  
+            if (volume < silenceThreshold) {  
+                // 6 ثواني للصمت التام، أو وقت الصمت العادي لو اتكلم وسكت
+                const currentDelay = hasStartedSpeaking ? silenceDelay : 6000;
 
-        setTimeout(() => this.startRecording(), 600);  
+                if (!silenceTimer) {  
+                    silenceTimer = setTimeout(() => this.stopRecording(!hasStartedSpeaking), currentDelay);  
+                }  
+            } else {  
+                clearTimeout(silenceTimer);  
+                silenceTimer = null;  
+            }  
+
+            if (mediaRecorder?.state === "recording") {  
+                requestAnimationFrame(checkSilence);  
+            }  
+        };  
+
+        checkSilence();  
 
     } catch (err) {  
-
         console.error(err);  
-        this.setVoiceState("idle");  
-        setTimeout(() => this.startRecording(), 1500);  
-    }  
-};
+        voiceState = "idle";  
+    }
 
 },
+
+async stopRecording(isAbsoluteSilence = false) {
+    if (!mediaRecorder || mediaRecorder.state !== "recording") return;  
+    if (voiceState !== "recording") return;  
+
+    this.setVoiceState("thinking");  
+    clearTimeout(silenceTimer);  
+    silenceTimer = null;  
+
+    mediaRecorder.stop();  
+    recordingStream?.getTracks().forEach(t => t.stop());  
+
+    // 1. إذا كان هناك صمت تام لمدة 6 ثواني
+    if (isAbsoluteSilence) {
+        ui.blindStatus.textContent = "لم يتم سماع شيء...";
+        await this.playLocalAudio("/uploads/silence_exit.mp3"); // صوت: عذرا لم أسمع شيء جاري العودة
+        this.backToGate();
+        return;
+    }
+
+    mediaRecorder.onstop = async () => {  
+        const blob = new Blob(audioChunks, { type: "audio/webm" });  
+        const form = new FormData();  
+        form.append("audio", blob, "voice.webm");  
+
+        try {  
+            const res = await fetch("/transcribe", { method: "POST", body: form });  
+            const data = await res.json();  
+
+            /* --- فلتر الهلوسة والضوضاء (التهييس) --- */
+            const rawText = data.text || "";
+            const cleanText = rawText.replace(/[.,!?؟،\s]/g, ""); 
+            const hallucinations = ["شكرا", "شكرالك", "شكرالكم", "الىاللقاء", "معالسلامة", "ترجمة", "مشاهدةممتعة", "نانسيعجرم", "عفوا", "النهاية"];
+            
+            const isHallucination = !cleanText || hallucinations.some(h => cleanText.includes(h)) || cleanText.length <= 2;
+
+            if (isHallucination) {  
+                emptyTranscriptCount++;  
+                voiceState = "idle";  
+                if (emptyTranscriptCount < MAX_EMPTY_TRANSCRIPTS) {
+                    ui.blindStatus.textContent = "لم أسمع بوضوح...";
+                    await this.playLocalAudio("/uploads/repeat.mp3"); // صوت: عذرا لم أسمع بوضوح هل يمكنك الإعادة
+                    return this.startRecording();  
+                }
+                emptyTranscriptCount = 0;  
+                ui.blindStatus.textContent = "لم أتمكن من سماعك...";
+                await this.playLocalAudio("/uploads/silence_exit.mp3"); // صوت: عذرا جاري العودة
+                this.backToGate();
+                return;  
+            }  
+
+            emptyTranscriptCount = 0;  
+            const userText = data.text.trim();  
+            this.append(userText, "user");  
+
+            /* ================= CAMERA COMMAND ================= */  
+            const lower = userText.toLowerCase();  
+            if (/افتح.*كاميرا|شغل.*كاميرا|صور|صوّر|شوف قدامي/.test(lower)) {
+                await this.captureAndDescribe();
+                return;
+            }
+
+            /* ================= NORMAL CHAT ================= */  
+            
+            // تشغيل صوت "جاري التفكير" المسجل
+            ui.blindStatus.textContent = "جاري التفكير...";
+            await this.playLocalAudio("/uploads/thinking.mp3");
+
+            const chatRes = await fetch("/chat", {  
+                method: "POST",  
+                headers: { "Content-Type": "application/json" },  
+                body: JSON.stringify({  
+                    message: userText,  
+                    history: this.chatHistory,  
+                    visionContext: lastVisionContext || null  
+                })  
+            });  
+
+            const chatData = await chatRes.json();  
+            const reply = chatData.reply || "حدث خطأ";  
+            this.append(reply, "bot");
+
+            // تشغيل تنبيه مسجل "يتم النطق الآن"
+            ui.blindStatus.textContent = "يتم النطق...";
+            await this.playLocalAudio("/uploads/speaking.mp3");
+            
+            // نطق الرد نفسه (يجب أن يبقى this.speak لأن الرد متغير من الذكاء الاصطناعي)
+            await this.speak(reply);  
+
+            this.setVoiceState("idle");  
+            setTimeout(() => this.startRecording(), 600);  
+
+        } catch (err) {  
+            console.error(err);  
+            this.setVoiceState("idle");  
+            setTimeout(() => this.startRecording(), 1500);  
+        }  
+    };
+},
+
 
 /* ================= TTS ================= */
 
@@ -839,6 +853,18 @@ playWelcome() {
     });
 
     localStorage.setItem("basira_visited","1");
+},
+
+playLocalAudio(url) {
+    return new Promise((resolve) => {
+        const audio = new Audio(url);
+        audio.onended = resolve; // لما الصوت يخلص، يكمل الكود
+        audio.onerror = resolve; // لو الملف مش موجود، يكمل الكود وميعلقش
+        audio.play().catch(e => {
+            console.log("خطأ في تشغيل الصوت:", e);
+            resolve();
+        });
+    });
 },
 
 bindEvents() {
